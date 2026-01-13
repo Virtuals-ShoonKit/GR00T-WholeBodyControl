@@ -1,4 +1,5 @@
 from pathlib import Path
+import shlex
 import signal
 import subprocess
 import sys
@@ -254,7 +255,10 @@ class G1Deployment:
             print("Upper body operation disabled in config.")
             return
 
-        self.start_teleop()
+        if self.config.upper_body_operation_mode == "inference":
+            self.start_inference()
+        else:
+            self.start_teleop()
 
     def start_teleop(self):
         """Start the teleoperation policy"""
@@ -299,6 +303,59 @@ class G1Deployment:
         else:
             print("Teleoperation policy started successfully.")
             print("Press 'l' in the control loop terminal to start teleoperation.")
+
+    def start_inference(self):
+        """Start the GR00T VLA inference policy"""
+        print("Starting GR00T VLA inference policy...")
+        cmd = [
+            sys.executable,
+            str(self.project_root / "gr00t_wbc/control/main/inference/run_inference_policy_loop.py"),
+            "--groot_server_host",
+            self.config.groot_server_host,
+            "--groot_server_port",
+            str(self.config.groot_server_port),
+            "--camera_host",
+            self.config.camera_host,
+            "--camera_port",
+            str(self.config.camera_port),
+            "--task_prompt",
+            shlex.quote(self.config.task_prompt),  # Properly quote task prompt with spaces
+            "--inference_frequency",
+            str(self.config.inference_frequency),
+            "--action_horizon",
+            str(self.config.action_horizon),
+        ]
+
+        # Handle boolean flags
+        if self.config.enable_waist:
+            cmd.append("--enable_waist")
+        else:
+            cmd.append("--no-enable_waist")
+
+        if self.config.with_hands:
+            cmd.append("--with_hands")
+        else:
+            cmd.append("--no-with_hands")
+
+        if self.config.enable_visualization:
+            cmd.append("--enable_visualization")
+        else:
+            cmd.append("--no-enable_visualization")
+
+        if self.config.dry_run:
+            cmd.append("--dry_run")
+        else:
+            cmd.append("--no-dry_run")
+
+        if not self._run_in_tmux("inference", cmd, pane_index=2):
+            print("ERROR: GR00T inference policy failed to start!")
+            print("Continuing without inference policy...")
+        else:
+            print("GR00T VLA inference policy started successfully.")
+            print(f"Task: '{self.config.task_prompt}'")
+            if self.config.dry_run:
+                print("  [DRY RUN MODE] Actions will NOT be sent to robot")
+            print("Press 'l' in the control loop terminal to start receiving VLA actions.")
 
     def start_data_collection(self):
         """Start the data collection process"""
@@ -367,6 +424,12 @@ class G1Deployment:
         print(f"  Gravity Compensation: {self.config.enable_gravity_compensation}")
         if self.config.enable_gravity_compensation:
             print(f"  Gravity Comp Joints: {self.config.gravity_compensation_joints}")
+        if self.config.upper_body_operation_mode == "inference":
+            print(f"  GR00T Server: {self.config.groot_server_host}:{self.config.groot_server_port}")
+            print(f"  Task Prompt: '{self.config.task_prompt}'")
+            print(f"  Inference Freq: {self.config.inference_frequency} Hz")
+            print(f"  Action Horizon: {self.config.action_horizon}")
+            print(f"  Dry Run: {self.config.dry_run}")
         print(
             f"  Webcam Recording: {self.config.enable_webcam_recording and self.config.env_type == 'real'}"
         )

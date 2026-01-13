@@ -168,7 +168,7 @@ class BaseConfig(ArgsConfigTemplate):
     """Path to teleop replay data."""
 
     # Deployment/Camera Configuration
-    robot_ip: str = "192.168.123.164"
+    robot_ip: str = "192.168.123.222"
     """Robot IP address"""
     # Data collection settings
     data_collection: bool = True
@@ -481,3 +481,22 @@ class DeploymentConfig(BaseConfig, ComposedCameraClientConfig):
 
     image_publish: bool = False
     """Enable image publishing in simulation loop (passed to run_sim_loop.py)"""
+
+    # GR00T VLA Inference settings
+    groot_server_host: str = "127.0.0.1"
+    """Host address for GR00T inference server (use 127.0.0.1 with --network=host)"""
+
+    groot_server_port: int = 5556
+    """Port for GR00T inference server"""
+
+    task_prompt: str = "pick up the apple and place it on the plate"
+    """Language task prompt for GR00T VLA"""
+
+    inference_frequency: int = 10
+    """Frequency of inference loop (Hz)"""
+
+    action_horizon: int = 8
+    """Number of action steps to execute per inference"""
+
+    dry_run: bool = False
+    """Don't send actions to robot (test mode)"""

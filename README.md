@@ -57,7 +57,21 @@ Once inside the container, the control policies can be launched directly.
   ```
 - Real robot: Ensure the host machine network is configured per the [G1 SDK Development Guide](https://support.unitree.com/home/en/G1_developer) and set a static IP at `192.168.123.222`, subnet mask `255.255.255.0`:
   ```bash
-  python gr00t_wbc/control/main/teleop/run_g1_control_loop.py --interface real
+  python gr00t_wbc/control/main/teleop/run_g1_control_loop.py --interface real --no-with_hands --no-high_elbow_pose
+  ```
+
+  ```bash
+python scripts/deploy_g1.py \
+    --interface real \
+    --camera_host 192.168.123.164 \
+    --camera_port 5555 \
+    --view_camera \
+    --no-with_hands \
+    --enable_gravity_compensation \
+    --enable_waist \
+    --no-high_elbow_pose \
+    --hand_control_device=pico \
+    --body_control_device=pico
   ```
 
 Keyboard shortcuts (terminal window):

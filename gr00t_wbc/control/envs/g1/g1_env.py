@@ -245,13 +245,14 @@ class G1Env(HumanoidEnv):
 
     def calibrate_hands(self):
         """Calibrate the hand joint qpos if real robot"""
-        if self.with_hands:
-            print("calibrating left hand")
-            self.hands().left.calibrate_hand()
-            print("calibrating right hand")
-            self.hands().right.calibrate_hand()
-        else:
-            print("Skipping hand calibration - hands disabled")
+        pass
+        # if not self.with_hands:
+        #     print("Skipping hand calibration - hands disabled")
+        # else:
+            # print("calibrating left hand")
+            # self.hands().left.calibrate_hand()
+            # print("calibrating right hand")
+            # self.hands().right.calibrate_hand()
 
     def set_ik_indicator(self, teleop_cmd):
         """Set the IK indicators for the simulator"""
