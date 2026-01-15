@@ -27,7 +27,9 @@ def main(config: TeleopConfig):
         robot_model = instantiate_g1_robot_model(
             waist_location=waist_location, high_elbow_pose=config.high_elbow_pose
         )
-        left_hand_ik_solver, right_hand_ik_solver = instantiate_g1_hand_ik_solver()
+        left_hand_ik_solver, right_hand_ik_solver = instantiate_g1_hand_ik_solver(
+            hand_type=config.hand_type
+        )
     else:
         raise ValueError(f"Unsupported robot name: {config.robot}")
 

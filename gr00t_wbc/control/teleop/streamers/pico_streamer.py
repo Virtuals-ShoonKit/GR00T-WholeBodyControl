@@ -42,8 +42,6 @@ class PicoStreamer(BaseStreamer):
         self.current_base_height = 0.74  # Initial base height, 0.74m (standing height)
         self.toggle_policy_action_last = False
         self.toggle_activation_last = False
-        self.toggle_data_collection_last = False
-        self.toggle_data_abort_last = False
 
     def start_streaming(self):
         pass
@@ -123,15 +121,9 @@ class PicoStreamer(BaseStreamer):
         lin_vel_y = self._apply_dead_zone(strafe_input, DEAD_ZONE) * MAX_LINEAR_VEL
         ang_vel_z = self._apply_dead_zone(yaw_input, DEAD_ZONE) * MAX_ANGULAR_VEL
 
-        # Get base height command
-        height_increment = 0.01  # Small step per call when button is pressed
-        if pico_data["Y"]:
-            self.current_base_height += height_increment
-        elif pico_data["X"]:
-            self.current_base_height -= height_increment
-        self.current_base_height = np.clip(self.current_base_height, 0.2, 0.74)
-
-        # Get gripper commands
+        # Note: X/Y buttons are now used for left thumb rotation
+        
+        # Get gripper commands (returns dict with finger/thumb values)
         left_fingers = self._generate_finger_data(pico_data, "left")
         right_fingers = self._generate_finger_data(pico_data, "right")
 
@@ -153,30 +145,17 @@ class PicoStreamer(BaseStreamer):
             toggle_activation = False
         self.toggle_activation_last = toggle_activation_tmp
 
-        # Get data collection commands
-        toggle_data_collection_tmp = pico_data["A"]
-        toggle_data_abort_tmp = pico_data["B"]
-
-        if self.toggle_data_collection_last != toggle_data_collection_tmp:
-            toggle_data_collection = toggle_data_collection_tmp
-        else:
-            toggle_data_collection = False
-        self.toggle_data_collection_last = toggle_data_collection_tmp
-
-        if self.toggle_data_abort_last != toggle_data_abort_tmp:
-            toggle_data_abort = toggle_data_abort_tmp
-        else:
-            toggle_data_abort = False
-        self.toggle_data_abort_last = toggle_data_abort_tmp
-
-        # print(f"toggle_data_collection: {toggle_data_collection}, toggle_data_abort: {toggle_data_abort}")
+        # Note: A/B buttons are now used for right thumb rotation
+        # Data collection can be toggled via menu buttons or joystick clicks
+        toggle_data_collection = False
+        toggle_data_abort = False
 
         return StreamerOutput(
             ik_data={
                 "left_wrist": left_controller_T,
                 "right_wrist": right_controller_T,
-                "left_fingers": {"position": left_fingers},
-                "right_fingers": {"position": right_fingers},
+                "left_fingers": left_fingers,  # Dict with "position" and "gripper_value"
+                "right_fingers": right_fingers,  # Dict with "position" and "gripper_value"
             },
             control_data={
                 "base_height_command": self.current_base_height,
@@ -245,25 +224,55 @@ class PicoStreamer(BaseStreamer):
         return sign * (abs(value) - dead_zone) / (1.0 - dead_zone)
 
     def _generate_finger_data(self, pico_data, hand):
-        """Generate finger position data."""
+        """Generate finger position data with analog trigger and grip values for decoupled control.
+        
+        For Inspire hands:
+        - Trigger controls 4 fingers (pinky, ring, middle, index)
+        - Grip controls thumb bend
+        - Right hand: B (+) / A (-) for thumb rotation
+        - Left hand: Y (+) / X (-) for thumb rotation
+        
+        This decoupling allows more natural grasping where thumb can be controlled
+        independently for precision grips.
+        """
         fingertips = np.zeros([25, 4, 4])
 
-        thumb = 0
-        index = 5
-        middle = 10
-        ring = 15
+        trigger_val = pico_data[f"{hand}_trigger"]
+        grip_val = pico_data[f"{hand}_grip"]
+        
+        # Get thumb rotation button states based on hand
+        if hand == "right":
+            # Right hand: B (+), A (-)
+            thumb_rot_plus = pico_data["B"]
+            thumb_rot_minus = pico_data["A"]
+        else:
+            # Left hand: Y (+), X (-)
+            thumb_rot_plus = pico_data["Y"]
+            thumb_rot_minus = pico_data["X"]
 
-        # Control thumb based on shoulder button state (index 4 is thumb tip)
-        fingertips[4 + thumb, 0, 3] = 1.0  # open thumb
-        if not pico_data["left_menu_button"]:
-            if pico_data[f"{hand}_trigger"] > 0.5 and not pico_data[f"{hand}_grip"] > 0.5:
-                fingertips[4 + index, 0, 3] = 1.0  # close index
-            elif pico_data[f"{hand}_trigger"] > 0.5 and pico_data[f"{hand}_grip"] > 0.5:
-                fingertips[4 + middle, 0, 3] = 1.0  # close middle
-            elif not pico_data[f"{hand}_trigger"] > 0.5 and pico_data[f"{hand}_grip"] > 0.5:
-                fingertips[4 + ring, 0, 3] = 1.0  # close ring
+        # DEBUG: Print when grip or thumb buttons are pressed
+        if grip_val > 0.1:
+            print(f"[PicoDebug-{hand}] GRIP pressed: {grip_val:.2f}")
+        if thumb_rot_plus:
+            print(f"[PicoDebug-{hand}] THUMB_ROT+ pressed (B/Y)")
+        if thumb_rot_minus:
+            print(f"[PicoDebug-{hand}] THUMB_ROT- pressed (A/X)")
+        if trigger_val > 0.1:
+            print(f"[PicoDebug-{hand}] TRIGGER pressed: {trigger_val:.2f}")
+        
+        # Store all values for decoupled finger/thumb control
+        # trigger_val: 0.0 = released (open), 1.0 = pressed (close) - controls 4 fingers
+        # grip_val: 0.0 = released (open), 1.0 = pressed (close) - controls thumb bend
+        # thumb_rot_plus/minus: button states for thumb rotation control
+        finger_data = {
+            "position": fingertips,
+            "gripper_value": trigger_val,      # 4 fingers (pinky, ring, middle, index)
+            "thumb_value": grip_val,           # Thumb bend control
+            "thumb_rot_plus": thumb_rot_plus,  # Thumb rotation + button
+            "thumb_rot_minus": thumb_rot_minus,  # Thumb rotation - button
+        }
 
-        return fingertips
+        return finger_data
 
 
 if __name__ == "__main__":

@@ -223,6 +223,9 @@ class G1Deployment:
         else:
             cmd.append("--no-with_hands")
 
+        # Add hand type configuration
+        cmd.extend(["--hand_type", self.config.hand_type])
+
         if self.config.high_elbow_pose:
             cmd.append("--high_elbow_pose")
         else:
@@ -281,6 +284,9 @@ class G1Deployment:
             cmd.append("--enable_waist")
         else:
             cmd.append("--no-enable_waist")
+
+        # Add hand type configuration
+        cmd.extend(["--hand_type", self.config.hand_type])
 
         if self.config.high_elbow_pose:
             cmd.append("--high_elbow_pose")

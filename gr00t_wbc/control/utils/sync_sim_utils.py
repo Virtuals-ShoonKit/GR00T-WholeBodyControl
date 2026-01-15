@@ -541,7 +541,10 @@ def get_teleop_policy(
     activate_keyboard_listener: bool = True,
 ) -> TeleopPolicy:
     if robot_type == "g1":
-        left_hand_ik_solver, right_hand_ik_solver = instantiate_g1_hand_ik_solver()
+        hand_type = getattr(config, "hand_type", "dex3")
+        left_hand_ik_solver, right_hand_ik_solver = instantiate_g1_hand_ik_solver(
+            hand_type=hand_type
+        )
     else:
         raise ValueError(f"Invalid robot type: {robot_type}")
 

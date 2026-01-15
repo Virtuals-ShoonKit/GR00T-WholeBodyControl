@@ -115,6 +115,8 @@ def make_hand_mode(motor_index: int) -> int:
 
 
 class HandCommandSender:
+    """Command sender for Dex3 (three-finger) hands via DDS."""
+    
     def __init__(self, is_left: bool = True):
         self.is_left = is_left
         if self.is_left:
@@ -144,3 +146,103 @@ class HandCommandSender:
             self.cmd.motor_cmd[i].kd = self.kd[i]
 
         self.cmd_pub.Write(self.cmd)
+
+
+class InspireHandCommandSender:
+    """
+    Command sender for Inspire RH56DFTP hands via DDS.
+    
+    Uses DDS channel "rt/inspire/cmd" to communicate with both hands.
+    Motors 0-5: Right hand [pinky, ring, middle, index, thumb_bend, thumb_rotation]
+    Motors 6-11: Left hand [pinky, ring, middle, index, thumb_bend, thumb_rotation]
+    
+    Values are in range [0, 1] where 0=close, 1=open
+    
+    Control mapping:
+    - Trigger: 4 fingers (pinky, ring, middle, index)
+    - Grip: Thumb bend
+    - Right hand: B (+) / A (-) for thumb rotation
+    - Left hand: Y (+) / X (-) for thumb rotation
+    """
+    
+    # Number of DOFs per hand
+    HAND_DOF = 6
+    
+    # Control parameters
+    MOTOR_MODE = 0x01  # Position control mode
+    KP = 1.0
+    KD = 0.2
+    
+    # Singleton publisher for both hands (shared DDS topic)
+    _cmd_pub = None
+    _cmd_msg = None
+    _initialized = False
+    
+    def __init__(self, is_left: bool = True):
+        from unitree_sdk2py.idl.unitree_go.msg.dds_ import MotorCmds_
+        from unitree_sdk2py.idl.default import unitree_go_msg_dds__MotorCmd_
+        
+        self.is_left = is_left
+        self.hand_dof = self.HAND_DOF
+        self.hand_name = "left" if is_left else "right"
+        
+        # Motor offset: left hand uses motors 6-11, right uses 0-5
+        self.motor_offset = 6 if is_left else 0
+        
+        # Initialize shared publisher (only once for both hands)
+        if not InspireHandCommandSender._initialized:
+            InspireHandCommandSender._cmd_pub = ChannelPublisher("rt/inspire/cmd", MotorCmds_)
+            InspireHandCommandSender._cmd_pub.Init()
+            
+            # Create message with 12 motors (6 per hand)
+            InspireHandCommandSender._cmd_msg = MotorCmds_()
+            InspireHandCommandSender._cmd_msg.cmds = [unitree_go_msg_dds__MotorCmd_() for _ in range(12)]
+            
+            # Initialize all motors to open position
+            for i in range(12):
+                InspireHandCommandSender._cmd_msg.cmds[i].mode = InspireHandCommandSender.MOTOR_MODE
+                InspireHandCommandSender._cmd_msg.cmds[i].q = 1.0  # Open
+                InspireHandCommandSender._cmd_msg.cmds[i].dq = 0.0
+                InspireHandCommandSender._cmd_msg.cmds[i].tau = 0.0
+                InspireHandCommandSender._cmd_msg.cmds[i].kp = InspireHandCommandSender.KP
+                InspireHandCommandSender._cmd_msg.cmds[i].kd = InspireHandCommandSender.KD
+            
+            InspireHandCommandSender._initialized = True
+            print(f"InspireHandCommandSender: DDS publisher initialized on 'rt/inspire/cmd'")
+        
+        print(f"InspireHandCommandSender: {self.hand_name} hand ready (motors {self.motor_offset}-{self.motor_offset + 5})")
+    
+    def send_command(self, cmd: np.ndarray):
+        """
+        Send command to the Inspire hand via DDS.
+        
+        Args:
+            cmd: Array of 6 motor positions in range [0, 1]
+                 Order: [pinky, ring, middle, index, thumb_bend, thumb_rotation]
+                 where 0=close, 1=open
+        """
+        # Update motor commands for this hand
+        for i in range(self.hand_dof):
+            motor_idx = self.motor_offset + i
+            position = float(np.clip(cmd[i], 0.01, 0.99))
+            InspireHandCommandSender._cmd_msg.cmds[motor_idx].q = position
+        
+        # Send command via DDS
+        InspireHandCommandSender._cmd_pub.Write(InspireHandCommandSender._cmd_msg)
+
+
+def get_hand_command_sender(hand_type: str, is_left: bool):
+    """
+    Factory function to get the appropriate hand command sender.
+    
+    Args:
+        hand_type: "dex3" for three-finger hands, "inspire" for Inspire hands
+        is_left: True for left hand, False for right hand
+    
+    Returns:
+        HandCommandSender or InspireHandCommandSender instance
+    """
+    if hand_type == "inspire":
+        return InspireHandCommandSender(is_left=is_left)
+    else:  # Default to dex3
+        return HandCommandSender(is_left=is_left)

@@ -7,7 +7,7 @@ from scipy.spatial.transform import Rotation as R
 
 from gr00t_wbc.control.base.humanoid_env import Hands, HumanoidEnv
 from gr00t_wbc.control.envs.g1.g1_body import G1Body
-from gr00t_wbc.control.envs.g1.g1_hand import G1ThreeFingerHand
+from gr00t_wbc.control.envs.g1.g1_hand import G1InspireHand, G1ThreeFingerHand, get_hand_class
 from gr00t_wbc.control.envs.g1.sim.simulator_factory import SimulatorFactory, init_channel
 from gr00t_wbc.control.envs.g1.utils.joint_safety import JointSafetyMonitor
 from gr00t_wbc.control.robot_model.instantiation.g1 import instantiate_g1_robot_model
@@ -50,10 +50,17 @@ class G1Env(HumanoidEnv):
             print(
                 f"Gravity compensation enabled for joint groups: {self.gravity_compensation_joints}"
             )
+        
+        # Get hand type from config (default to dex3 for three-finger hands)
+        self.hand_type = config.get("hand_type", "dex3")
+        
         if self.with_hands:
             self._hands = Hands()
-            self._hands.left = G1ThreeFingerHand(is_left=True)
-            self._hands.right = G1ThreeFingerHand(is_left=False)
+            # Use factory function to get appropriate hand class based on hand_type
+            HandClass = get_hand_class(self.hand_type)
+            self._hands.left = HandClass(is_left=True)
+            self._hands.right = HandClass(is_left=False)
+            print(f"G1Env: Initialized {self.hand_type} hands")
 
         # Initialize simulator if in simulation mode
         self.use_sim = self.config.get("ENV_TYPE") == "sim"
@@ -246,13 +253,13 @@ class G1Env(HumanoidEnv):
     def calibrate_hands(self):
         """Calibrate the hand joint qpos if real robot"""
         pass
-        # if not self.with_hands:
-        #     print("Skipping hand calibration - hands disabled")
-        # else:
-            # print("calibrating left hand")
-            # self.hands().left.calibrate_hand()
-            # print("calibrating right hand")
-            # self.hands().right.calibrate_hand()
+        if not self.with_hands:
+            print("Skipping hand calibration - hands disabled")
+        else:
+            print("calibrating left hand")
+            self.hands().left.calibrate_hand()
+            print("calibrating right hand")
+            self.hands().right.calibrate_hand()
 
     def set_ik_indicator(self, teleop_cmd):
         """Set the IK indicators for the simulator"""
