@@ -39,9 +39,12 @@ class PicoStreamer(BaseStreamer):
             print("Pico service not running")
 
     def reset_status(self):
-        self.current_base_height = 0.74  # Initial base height, 0.74m (standing height)
+        self.current_base_height = 0.71  # Initial base height (range: 0.65-0.75)
         self.toggle_policy_action_last = False
         self.toggle_activation_last = False
+        self.height_up_last = False  # For menu+Y debouncing
+        self.height_down_last = False  # For menu+X debouncing
+        self.reset_pose_last = False  # For menu+A debouncing
 
     def start_streaming(self):
         pass
@@ -121,7 +124,33 @@ class PicoStreamer(BaseStreamer):
         lin_vel_y = self._apply_dead_zone(strafe_input, DEAD_ZONE) * MAX_LINEAR_VEL
         ang_vel_z = self._apply_dead_zone(yaw_input, DEAD_ZONE) * MAX_ANGULAR_VEL
 
-        # Note: X/Y buttons are now used for left thumb rotation
+        # Get base height command (menu + X/Y with debouncing)
+        height_increment = 0.02  # Step size per button press
+        menu_pressed = pico_data["left_menu_button"]
+        
+        height_up_pressed = menu_pressed and pico_data["Y"]
+        height_down_pressed = menu_pressed and pico_data["X"]
+        
+        # Only trigger on rising edge (button press, not hold)
+        if height_up_pressed and not self.height_up_last:
+            self.current_base_height += height_increment
+            print(f"[BaseHeight] UP -> {self.current_base_height:.2f}")
+        elif height_down_pressed and not self.height_down_last:
+            self.current_base_height -= height_increment
+            print(f"[BaseHeight] DOWN -> {self.current_base_height:.2f}")
+        
+        self.height_up_last = height_up_pressed
+        self.height_down_last = height_down_pressed
+        self.current_base_height = np.clip(self.current_base_height, 0.60, 0.80)
+        
+        # Get reset to default pose command (menu + A with debouncing)
+        reset_pose_pressed = menu_pressed and pico_data["A"]
+        if reset_pose_pressed and not self.reset_pose_last:
+            reset_to_default_pose = True
+            print("[ResetPose] Triggered - resetting to default pose")
+        else:
+            reset_to_default_pose = False
+        self.reset_pose_last = reset_pose_pressed
         
         # Get gripper commands (returns dict with finger/thumb values)
         left_fingers = self._generate_finger_data(pico_data, "left")
@@ -161,6 +190,7 @@ class PicoStreamer(BaseStreamer):
                 "base_height_command": self.current_base_height,
                 "navigate_cmd": [lin_vel_x, lin_vel_y, ang_vel_z],
                 "toggle_policy_action": toggle_policy_action,
+                "reset_to_default_pose": reset_to_default_pose,
             },
             teleop_data={
                 "toggle_activation": toggle_activation,

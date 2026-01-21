@@ -70,7 +70,9 @@ class TeleopPolicy(Policy):
 
         # Handle activation using teleop_data commands
         self.check_activation(
-            streamer_output.teleop_data, wait_for_activation=self.wait_for_activation
+            streamer_output.teleop_data, 
+            wait_for_activation=self.wait_for_activation,
+            control_data=streamer_output.control_data
         )
 
         action = {}
@@ -137,14 +139,17 @@ class TeleopPolicy(Policy):
         self.teleop_streamer.stop_streaming()
         return True
 
-    def check_activation(self, teleop_data: dict, wait_for_activation: int = 5):
+    def check_activation(self, teleop_data: dict, wait_for_activation: int = 5, control_data: dict = None):
         """Activation logic only looks at teleop data commands"""
         key = self.keyboard_listener.read_msg() if self.keyboard_listener else ""
         toggle_activation_by_keyboard = key == "l"
         reset_teleop_policy_by_keyboard = key == "k"
         toggle_activation_by_teleop = teleop_data.get("toggle_activation", False)
+        
+        # Check for reset signal from pico controller (menu + A)
+        reset_to_default_pose = control_data.get("reset_to_default_pose", False) if control_data else False
 
-        if reset_teleop_policy_by_keyboard:
+        if reset_teleop_policy_by_keyboard or reset_to_default_pose:
             print("Resetting teleop policy")
             self.reset()
 
@@ -190,7 +195,8 @@ class TeleopPolicy(Policy):
         """activate the teleop policy"""
         self.is_active = False
         self.check_activation(
-            teleop_data={"toggle_activation": True}, wait_for_activation=wait_for_activation
+            teleop_data={"toggle_activation": True}, wait_for_activation=wait_for_activation,
+            control_data={}
         )
 
     def reset(self, wait_for_activation: int = 5, auto_activate: bool = False):

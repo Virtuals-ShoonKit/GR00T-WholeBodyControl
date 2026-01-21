@@ -1,0 +1,23 @@
+# Inspire Hand Configuration
+# Values are in range [0, 1] where 0=close, 1=open
+
+# Finger closing limits (as percentage, e.g., 0.9 = 90% max close)
+# The actual min_open value = 1.0 - max_close
+finger_limits:
+  # Thumb and index finger max closing percentage
+  thumb_index_max_close: 0.9  # Can close 90%, min open = 0.1
+  # Other fingers (pinky, ring, middle) max closing percentage  
+  other_fingers_max_close: 0.7  # Can close 70%, min open = 0.3
+  # Minimum open position (floor for all fingers)
+  min_open_floor: 0.1
+
+# Interpolation speeds (0.0-1.0)
+# Lower = smoother/slower, Higher = faster/more responsive
+interpolation:
+  finger_speed: 0.7  # Speed for 4 fingers
+  thumb_speed: 0.5   # Speed for thumb (more precise control)
+
+# Thumb rotation settings
+thumb_rotation:
+  increment: 0.05  # Increment per update when button is held
+

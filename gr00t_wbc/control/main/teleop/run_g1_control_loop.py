@@ -163,6 +163,24 @@ def main(config: ControlLoopConfig):
                 if wbc_goal.get("toggle_data_abort", False):
                     dispatcher.handle_key("x")
 
+                # Reset to default pose (menu + A from pico controller)
+                if wbc_goal.get("reset_to_default_pose", False):
+                    print("Resetting to default pose")
+                    dispatcher.handle_key("k")
+                    
+                    # Clear upper body commands
+                    upper_body_policy_subscriber._msg = None
+                    upper_body_cmd = {
+                        "target_upper_body_pose": obs["q"][
+                            robot_model.get_joint_group_indices("upper_body")
+                        ],
+                        "wrist_pose": DEFAULT_WRIST_POSE,
+                        "base_height_command": DEFAULT_BASE_HEIGHT,
+                        "navigate_cmd": DEFAULT_NAV_CMD,
+                    }
+                    last_teleop_cmd = upper_body_cmd.copy()
+                    time.sleep(0.5)
+
                 if env.use_sim and wbc_goal.get("reset_env_and_policy", False):
                     print("Resetting sim environment and policy")
                     # Reset teleop policy & sim env

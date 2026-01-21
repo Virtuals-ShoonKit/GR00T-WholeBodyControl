@@ -262,9 +262,9 @@ class G1GearWbcPolicy(Policy):
             self.cmd[1] = 0.0
             self.cmd[2] = 0.0
         elif key == "1":
-            self.height_cmd += 0.1
+            self.height_cmd += 0.02
         elif key == "2":
-            self.height_cmd -= 0.1
+            self.height_cmd -= 0.02
         elif key == "n":
             self.freq_cmd -= 0.1
             self.freq_cmd = max(1.0, self.freq_cmd)
